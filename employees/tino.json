@@ -1,0 +1,13 @@
+{
+  "id": 5,
+  "name": "Tino",
+  "email": "tino@fenix.com",
+  "password": "admin123",
+  "role": "worker",
+  "phone": "+389-70-567-890",
+  "department": "Construction",
+  "hire_date": "2024-01-05",
+  "status": "active",
+  "created_at": "2024-01-05T00:00:00Z",
+  "updated_at": "2024-01-05T00:00:00Z"
+} 

@@ -1,0 +1,1872 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { Clock, MapPin, Camera, Play, Pause, Square, Car, Fuel, Users, Calendar, BarChart3, Settings, LogOut, Upload, FileText, Image, Download, Trash2, Eye, File } from 'lucide-react';
+import { GoogleMap, Marker, useJsApiLoader } from '@react-google-maps/api';
+
+const EmployeeTrackingApp = () => {
+  const [currentUser, setCurrentUser] = useState(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [currentView, setCurrentView] = useState('splash');
+  const [workSession, setWorkSession] = useState(null);
+  const [location, setLocation] = useState(null);
+  const [employees, setEmployees] = useState([
+    { id: 1, name: 'Petre', email: 'petre@fenix.com', password: 'admin123' },
+    { id: 2, name: 'Ilija', email: 'ilija@fenix.com', password: 'admin123' },
+    { id: 3, name: 'Vojne', email: 'vojne@fenix.com', password: 'admin123' },
+    { id: 4, name: 'Dragan', email: 'dragan@fenix.com', password: 'admin123' },
+    { id: 5, name: 'Tino', email: 'tino@fenix.com', password: 'admin123' },
+    { id: 6, name: 'Vane', email: 'vane@fenix.com', password: 'admin123' }
+  ]);
+  const [workLogs, setWorkLogs] = useState([]);
+  const [vehicles] = useState([
+    { id: 1, name: 'Van #1', plate: 'ABC-123' },
+    { id: 2, name: 'Van #2', plate: 'DEF-456' },
+    { id: 3, name: 'Truck #1', plate: 'GHI-789' },
+    { id: 4, name: 'Worker Van', plate: 'XYZ-999' },
+    { id: 5, name: 'Personal Car', plate: 'Own Vehicle' }
+  ]);
+
+  // App Files State
+  const [appFiles, setAppFiles] = useState([]);
+  const fileInputRef = useRef(null);
+  const [previewFile, setPreviewFile] = useState(null);
+
+  const [activeTab, setActiveTab] = useState('overview');
+  const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [employeeLocations, setEmployeeLocations] = useState({});
+  const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY || 'AIzaSyAuDjIik681kmwRz56jEQULsxmTif_tFHI';
+
+  // File Management Functions
+  const addFileToAppFiles = (fileData) => {
+    const newFile = {
+      id: Date.now() + Math.random(),
+      fileName: fileData.fileName,
+      originalName: fileData.originalName || fileData.fileName,
+      fileType: fileData.fileType,
+      fileSize: fileData.fileSize,
+      filePath: fileData.filePath || fileData.url,
+      mimeType: fileData.mimeType,
+      category: fileData.category,
+      uploadedBy: fileData.uploadedBy,
+      uploadedByName: fileData.uploadedByName,
+      uploadedByType: fileData.uploadedByType,
+      uploadDate: new Date().toISOString(),
+      description: fileData.description || '',
+      tags: fileData.tags || [],
+      relatedWorkSessionId: fileData.relatedWorkSessionId || null,
+      relatedEmployeeId: fileData.relatedEmployeeId || null,
+      isPublic: fileData.isPublic || false,
+      status: 'active'
+    };
+    
+    setAppFiles(prev => [...prev, newFile]);
+    return newFile;
+  };
+
+  const removeFileFromAppFiles = (fileId) => {
+    setAppFiles(prev => prev.filter(file => file.id !== fileId));
+  };
+
+  const updateFileInAppFiles = (fileId, updates) => {
+    setAppFiles(prev => prev.map(file => 
+      file.id === fileId ? { ...file, ...updates } : file
+    ));
+  };
+
+  const getFilesByCategory = (category) => {
+    return appFiles.filter(file => file.category === category && file.status === 'active');
+  };
+
+  const getFilesByUser = (userId, userType) => {
+    return appFiles.filter(file => 
+      file.uploadedBy === userId && 
+      file.uploadedByType === userType && 
+      file.status === 'active'
+    );
+  };
+
+  const getFileIcon = (mimeType, category) => {
+    if (category === 'screenshot') return Camera;
+    if (mimeType?.startsWith('image/')) return Image;
+    if (mimeType?.includes('pdf')) return FileText;
+    if (mimeType?.includes('document') || mimeType?.includes('word')) return FileText;
+    if (mimeType?.includes('spreadsheet') || mimeType?.includes('excel')) return FileText;
+    return File;
+  };
+
+  const openFile = (file) => {
+    if (file.mimeType?.startsWith('image/') || file.category === 'screenshot') {
+      setPreviewFile(file);
+    } else if (file.mimeType?.includes('pdf')) {
+      window.open(file.filePath, '_blank');
+    } else {
+      window.open(file.filePath, '_blank');
+    }
+  };
+
+  const downloadFile = (file) => {
+    const link = document.createElement('a');
+    link.href = file.filePath;
+    link.download = file.originalName;
+    link.style.display = 'none';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const formatFileSize = (bytes) => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
+  const captureScreenshot = (workSessionId = null) => {
+    const screenshotData = {
+      fileName: `screenshot_${Date.now()}.jpg`,
+      originalName: `Screenshot_${new Date().toLocaleString()}.jpg`,
+      fileType: 'image',
+      fileSize: 245760,
+      mimeType: 'image/jpeg',
+      category: 'screenshot',
+      uploadedBy: currentUser.id,
+      uploadedByName: currentUser.name,
+      uploadedByType: isAdmin ? 'admin' : 'employee',
+      description: 'Work progress screenshot',
+      tags: ['work', 'progress', 'screenshot'],
+      relatedWorkSessionId: workSessionId,
+      relatedEmployeeId: currentUser.id,
+      isPublic: false,
+      filePath: `/screenshots/screenshot_${Date.now()}.jpg`
+    };
+
+    return addFileToAppFiles(screenshotData);
+  };
+
+  const handleFileUpload = async (files, category = 'document', description = '') => {
+    const uploadedFiles = [];
+    
+    for (let file of files) {
+      const fileData = {
+        fileName: `${Date.now()}_${file.name}`,
+        originalName: file.name,
+        fileType: file.type.startsWith('image/') ? 'image' : 'document',
+        fileSize: file.size,
+        mimeType: file.type,
+        category: category,
+        uploadedBy: currentUser.id,
+        uploadedByName: currentUser.name,
+        uploadedByType: isAdmin ? 'admin' : 'employee',
+        description: description,
+        tags: [],
+        isPublic: true,
+        filePath: `/uploads/${Date.now()}_${file.name}`
+      };
+
+      const uploadedFile = addFileToAppFiles(fileData);
+      uploadedFiles.push(uploadedFile);
+    }
+
+    return uploadedFiles;
+  };
+
+  // Splash Screen Component
+  const SplashScreen = () => {
+    useEffect(() => {
+      const timer = setTimeout(() => {
+        setCurrentView('login');
+      }, 3000);
+
+      return () => clearTimeout(timer);
+    }, []);
+
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-orange-500 to-red-600 flex items-center justify-center">
+        <div className="text-center">
+          <div className="mb-8">
+            <img 
+              src="/copilot.png" 
+              alt="FENIX Logo" 
+              className="mx-auto w-64 h-32 object-contain animate-pulse" 
+            />
+          </div>
+          <h1 className="text-5xl font-bold text-white mb-4 animate-fade-in">FENIX</h1>
+          <p className="text-xl text-white/90 animate-fade-in-delay">Construction Tracker</p>
+          <div className="mt-8">
+            <div className="w-16 h-1 bg-white mx-auto rounded-full animate-ping"></div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Login Component
+  const LoginForm = () => {
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+
+    const handleLogin = () => {
+      // Check for admin login
+      if (email === 'kango@fenix.com' && password === 'admin123') {
+        setCurrentUser({ id: 0, name: 'Admin', email: 'kango@fenix.com' });
+        setIsAdmin(true);
+        setCurrentView('admin');
+        return;
+      }
+
+      // Check for employee login
+      const employee = employees.find(emp => emp.email === email && emp.password === password);
+      if (employee) {
+        setCurrentUser(employee);
+        setIsAdmin(false);
+        setCurrentView('employee');
+        getCurrentLocation();
+      } else {
+        alert('Invalid credentials');
+      }
+    };
+
+    const handleKeyPress = (e) => {
+      if (e.key === 'Enter') {
+        handleLogin();
+      }
+    };
+
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-orange-500 to-red-600 flex items-center justify-center p-4">
+        <div className="bg-white rounded-lg shadow-xl p-8 w-full max-w-md">
+          <div className="text-center mb-8">
+            <div className="mb-6">
+              <img src="/copilot.png" alt="FENIX Logo" className="mx-auto w-48 h-24 object-contain" />
+            </div>
+            <h1 className="text-4xl font-bold text-gray-800 mb-2">FENIX</h1>
+            <p className="text-gray-600">Construction Tracker</p>
+          </div>
+          
+          <div className="space-y-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
+                placeholder="Enter your email"
+                required
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Password</label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                onKeyPress={handleKeyPress}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
+                placeholder="Enter your password"
+                required
+              />
+            </div>
+            
+            <button
+              onClick={handleLogin}
+              className="w-full bg-orange-500 text-white py-2 px-4 rounded-md hover:bg-orange-600 transition duration-200"
+            >
+              Login
+            </button>
+          </div>
+          
+          <div className="mt-6 text-sm text-gray-600 text-center">
+            <p>We build better tomorrow</p>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Get current location
+  const getCurrentLocation = () => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setLocation({
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+            timestamp: new Date().toISOString()
+          });
+        },
+        (error) => {
+          console.error('Error getting location:', error);
+          setLocation({ error: 'Location not available' });
+        }
+      );
+    }
+  };
+
+  // Employee Dashboard Component
+  const EmployeeDashboard = () => {
+    const [selectedVehicle, setSelectedVehicle] = useState('');
+    const [gasAmount, setGasAmount] = useState('');
+    const [workDescription, setWorkDescription] = useState('');
+    const [screenshot, setScreenshot] = useState(null);
+    const [showVehicleModal, setShowVehicleModal] = useState(false);
+
+    const startWork = () => {
+      if (!selectedVehicle) {
+        setShowVehicleModal(true);
+        return;
+      }
+      
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            const startLocation = {
+              latitude: position.coords.latitude,
+              longitude: position.coords.longitude,
+              timestamp: new Date().toISOString()
+            };
+            
+            const session = {
+              id: Date.now(),
+              employeeId: currentUser.id,
+              employeeName: currentUser.name,
+              startTime: new Date().toISOString(),
+              startLocation: startLocation,
+              vehicle: vehicles.find(v => v.id === parseInt(selectedVehicle)),
+              gasAmount: parseFloat(gasAmount) || 0,
+              workDescription: workDescription,
+              screenshots: [],
+              breaks: [],
+              status: 'working',
+              locationHistory: [startLocation]
+            };
+            setWorkSession(session);
+            setWorkLogs([...workLogs, session]);
+          },
+          (error) => {
+            const startLocation = { error: 'Location not available' };
+            
+            const session = {
+              id: Date.now(),
+              employeeId: currentUser.id,
+              employeeName: currentUser.name,
+              startTime: new Date().toISOString(),
+              startLocation: startLocation,
+              vehicle: vehicles.find(v => v.id === parseInt(selectedVehicle)),
+              gasAmount: parseFloat(gasAmount) || 0,
+              workDescription: workDescription,
+              screenshots: [],
+              breaks: [],
+              status: 'working',
+              locationHistory: [startLocation]
+            };
+            setWorkSession(session);
+            setWorkLogs([...workLogs, session]);
+          }
+        );
+      }
+    };
+
+    const takeBreak = () => {
+      if (workSession) {
+        const updatedSession = {
+          ...workSession,
+          breaks: [...workSession.breaks, {
+            start: new Date().toISOString(),
+            location: location
+          }],
+          status: 'break'
+        };
+        setWorkSession(updatedSession);
+        updateWorkLog(updatedSession);
+      }
+    };
+
+    const resumeWork = () => {
+      if (workSession && workSession.breaks.length > 0) {
+        const lastBreak = workSession.breaks[workSession.breaks.length - 1];
+        lastBreak.end = new Date().toISOString();
+        
+        const updatedSession = {
+          ...workSession,
+          status: 'working'
+        };
+        setWorkSession(updatedSession);
+        updateWorkLog(updatedSession);
+      }
+    };
+
+    const endWork = () => {
+      if (workSession) {
+        const updatedSession = {
+          ...workSession,
+          endTime: new Date().toISOString(),
+          endLocation: location,
+          status: 'completed'
+        };
+        setWorkSession(null);
+        updateWorkLog(updatedSession);
+      }
+    };
+
+    const updateWorkLog = (session) => {
+      setWorkLogs(logs => logs.map(log => 
+        log.id === session.id ? session : log
+      ));
+    };
+
+    const takeScreenshot = () => {
+      const screenshotFile = captureScreenshot(workSession?.id);
+      
+      const screenshotData = {
+        id: screenshotFile.id,
+        timestamp: screenshotFile.uploadDate,
+        location: location,
+        type: 'work_progress',
+        fileId: screenshotFile.id
+      };
+
+      if (workSession) {
+        const updatedSession = {
+          ...workSession,
+          screenshots: [...workSession.screenshots, screenshotData]
+        };
+        setWorkSession(updatedSession);
+        updateWorkLog(updatedSession);
+      }
+
+      setScreenshot(screenshotData);
+      setTimeout(() => setScreenshot(null), 3000);
+    };
+
+    useEffect(() => {
+      let intervalId;
+      if (workSession && workSession.status === 'working') {
+        intervalId = setInterval(() => {
+          if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+              (position) => {
+                const newLocation = {
+                  latitude: position.coords.latitude,
+                  longitude: position.coords.longitude,
+                  timestamp: new Date().toISOString()
+                };
+                setWorkSession(prev => {
+                  if (!prev) return prev;
+                  const updatedHistory = prev.locationHistory ? [...prev.locationHistory, newLocation] : [newLocation];
+                  const updated = { ...prev, locationHistory: updatedHistory };
+                  updateWorkLog(updated);
+                  return updated;
+                });
+              }
+            );
+          }
+        }, 10 * 60 * 1000);
+      }
+      return () => clearInterval(intervalId);
+    }, [workSession]);
+
+    return (
+      <div className="min-h-screen bg-gray-100">
+        {/* Header */}
+        <div className="bg-white shadow-sm border-b">
+          <div className="px-4 py-3 flex justify-between items-center">
+            <h1 className="text-xl font-bold text-gray-800">Welcome, {currentUser.name}</h1>
+            <button
+              onClick={() => {
+                setCurrentUser(null);
+                setCurrentView('login');
+                setWorkSession(null);
+              }}
+              className="text-gray-500 hover:text-gray-700"
+            >
+              <LogOut size={20} />
+            </button>
+          </div>
+        </div>
+
+        <div className="p-4 space-y-4">
+          {/* Status Card */}
+          <div className="bg-white rounded-lg shadow p-4">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold">Work Status</h2>
+              <div className={`px-3 py-1 rounded-full text-sm font-medium ${
+                workSession ? 
+                  workSession.status === 'working' ? 'bg-green-100 text-green-800' :
+                  workSession.status === 'break' ? 'bg-yellow-100 text-yellow-800' : 
+                  'bg-gray-100 text-gray-800'
+                : 'bg-gray-100 text-gray-800'
+              }`}>
+                {workSession ? 
+                  workSession.status === 'working' ? 'Working' :
+                  workSession.status === 'break' ? 'On Break' : 'Idle'
+                : 'Not Started'}
+              </div>
+            </div>
+
+            {workSession && (
+              <div className="space-y-2 text-sm text-gray-600">
+                <p><span className="font-medium">Started:</span> {new Date(workSession.startTime).toLocaleString()}</p>
+                <p><span className="font-medium">Vehicle:</span> {workSession.vehicle?.name}</p>
+                <p><span className="font-medium">Gas:</span> {workSession.gasAmount} L</p>
+                {workSession.workDescription && (
+                  <div>
+                    <p className="font-medium">Work Description:</p>
+                    <p className="text-gray-700 bg-gray-50 p-2 rounded mt-1">{workSession.workDescription}</p>
+                  </div>
+                )}
+                <p><span className="font-medium">Screenshots:</span> {workSession.screenshots.length}</p>
+                <p><span className="font-medium">Breaks:</span> {workSession.breaks.length}</p>
+              </div>
+            )}
+          </div>
+
+          {/* Location Card */}
+          <div className="bg-white rounded-lg shadow p-4">
+            <div className="flex items-center mb-2">
+              <MapPin className="text-orange-500 mr-2" size={20} />
+              <h3 className="font-semibold">Current Location</h3>
+            </div>
+            {location ? (
+              location.error ? (
+                <p className="text-red-500 text-sm">{location.error}</p>
+              ) : (
+                <p className="text-sm text-gray-600">
+                  {location.latitude?.toFixed(6)}, {location.longitude?.toFixed(6)}
+                </p>
+              )
+            ) : (
+              <p className="text-gray-500 text-sm">Getting location...</p>
+            )}
+          </div>
+
+          {/* Action Buttons */}
+          <div className="space-y-3">
+            {!workSession ? (
+              <button
+                onClick={startWork}
+                className="w-full bg-green-500 text-white py-4 px-6 rounded-lg flex items-center justify-center space-x-2 hover:bg-green-600 transition duration-200"
+              >
+                <Play size={20} />
+                <span className="font-semibold">Start Work</span>
+              </button>
+            ) : (
+              <>
+                {workSession.status === 'working' ? (
+                  <button
+                    onClick={takeBreak}
+                    className="w-full bg-yellow-500 text-white py-4 px-6 rounded-lg flex items-center justify-center space-x-2 hover:bg-yellow-600 transition duration-200"
+                  >
+                    <Pause size={20} />
+                    <span className="font-semibold">Take Break</span>
+                  </button>
+                ) : (
+                  <button
+                    onClick={resumeWork}
+                    className="w-full bg-blue-500 text-white py-4 px-6 rounded-lg flex items-center justify-center space-x-2 hover:bg-blue-600 transition duration-200"
+                  >
+                    <Play size={20} />
+                    <span className="font-semibold">Resume Work</span>
+                  </button>
+                )}
+
+                <button
+                  onClick={takeScreenshot}
+                  className="w-full bg-purple-500 text-white py-4 px-6 rounded-lg flex items-center justify-center space-x-2 hover:bg-purple-600 transition duration-200"
+                >
+                  <Camera size={20} />
+                  <span className="font-semibold">Take Screenshot</span>
+                </button>
+
+                <button
+                  onClick={endWork}
+                  className="w-full bg-red-500 text-white py-4 px-6 rounded-lg flex items-center justify-center space-x-2 hover:bg-red-600 transition duration-200"
+                >
+                  <Square size={20} />
+                  <span className="font-semibold">End Work</span>
+                </button>
+              </>
+            )}
+          </div>
+
+          {/* My Files Section */}
+          <div className="bg-white rounded-lg shadow p-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold flex items-center">
+                <FileText className="text-orange-500 mr-2" size={20} />
+                My Files
+              </h3>
+              <span className="text-sm text-gray-500">
+                {getFilesByUser(currentUser.id, 'employee').length} files
+              </span>
+            </div>
+            
+            <div className="space-y-2 max-h-60 overflow-y-auto">
+              {getFilesByUser(currentUser.id, 'employee').slice(0, 10).map((file) => {
+                const FileIcon = getFileIcon(file.mimeType, file.category);
+                return (
+                  <div key={file.id} className="flex items-center justify-between p-2 bg-gray-50 rounded hover:bg-gray-100 transition duration-200">
+                    <div 
+                      className="flex items-center space-x-2 flex-1 cursor-pointer"
+                      onClick={() => openFile(file)}
+                      title="Click to open file"
+                    >
+                      <FileIcon 
+                        size={16} 
+                        className={file.category === 'screenshot' ? 'text-purple-500' : 'text-gray-500'}
+                      />
+                      <div>
+                        <p className="text-sm font-medium text-gray-900 truncate max-w-32 hover:text-blue-600">
+                          {file.originalName}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {formatFileSize(file.fileSize)} • {new Date(file.uploadDate).toLocaleDateString()}
+                        </p>
+                        {file.description && (
+                          <p className="text-xs text-gray-400 truncate max-w-40">
+                            {file.description}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-1">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openFile(file);
+                        }}
+                        className="p-1 text-gray-500 hover:text-blue-500 transition duration-200"
+                        title="View file"
+                      >
+                        <Eye size={14} />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          downloadFile(file);
+                        }}
+                        className="p-1 text-gray-500 hover:text-green-500 transition duration-200"
+                        title="Download file"
+                      >
+                        <Download size={14} />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+              {getFilesByUser(currentUser.id, 'employee').length === 0 && (
+                <div className="text-center py-4 text-gray-500">
+                  <Camera size={32} className="mx-auto mb-2 text-gray-300" />
+                  <p className="text-sm">No files uploaded yet</p>
+                  <p className="text-xs">Take screenshots during work to see them here</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Vehicle Selection Modal */}
+        {showVehicleModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-lg p-6 w-full max-w-md">
+              <h3 className="text-lg font-semibold mb-4">Select Vehicle & Gas</h3>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Vehicle</label>
+                  <select
+                    value={selectedVehicle}
+                    onChange={(e) => setSelectedVehicle(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
+                    required
+                  >
+                    <option value="">Select a vehicle</option>
+                    {vehicles.map(vehicle => (
+                      <option key={vehicle.id} value={vehicle.id}>
+                        {vehicle.name} ({vehicle.plate})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Gas Amount (Liters)</label>
+                  <input
+                    type="number"
+                    value={gasAmount}
+                    onChange={(e) => setGasAmount(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
+                    placeholder="Enter gas amount"
+                    min="0"
+                    step="0.1"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Work Description</label>
+                  <textarea
+                    value={workDescription}
+                    onChange={(e) => setWorkDescription(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
+                    placeholder="Describe your work for today..."
+                    rows="3"
+                  />
+                </div>
+
+                <div className="flex space-x-3">
+                  <button
+                    onClick={() => setShowVehicleModal(false)}
+                    className="flex-1 bg-gray-300 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-400 transition duration-200"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (selectedVehicle) {
+                        setShowVehicleModal(false);
+                        startWork();
+                      }
+                    }}
+                    className="flex-1 bg-orange-500 text-white py-2 px-4 rounded-md hover:bg-orange-600 transition duration-200"
+                  >
+                    Start Work
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Screenshot Notification */}
+        {screenshot && (
+          <div className="fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-50">
+            <div className="flex items-center space-x-2">
+              <Camera size={16} />
+              <span>Screenshot captured!</span>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // Admin Dashboard Component
+  const AdminDashboard = () => {
+    const calculateWorkHours = (log) => {
+      if (!log.startTime || !log.endTime) return 0;
+      
+      const start = new Date(log.startTime);
+      const end = new Date(log.endTime);
+      const totalMs = end - start;
+      
+      const breakMs = log.breaks.reduce((total, breakItem) => {
+        if (breakItem.start && breakItem.end) {
+          const breakStart = new Date(breakItem.start);
+          const breakEnd = new Date(breakItem.end);
+          return total + (breakEnd - breakStart);
+        }
+        return total;
+      }, 0);
+      
+      return Math.max(0, (totalMs - breakMs) / (1000 * 60 * 60));
+    };
+
+    const getTotalHoursThisMonth = (employeeId) => {
+      const now = new Date();
+      const currentMonth = now.getMonth();
+      const currentYear = now.getFullYear();
+      
+      return workLogs
+        .filter(log => {
+          const logDate = new Date(log.startTime);
+          return log.employeeId === employeeId && 
+                 logDate.getMonth() === currentMonth && 
+                 logDate.getFullYear() === currentYear &&
+                 log.status === 'completed';
+        })
+        .reduce((total, log) => total + calculateWorkHours(log), 0);
+    };
+
+    const OverviewTab = () => (
+      <div className="space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="bg-white rounded-lg shadow p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Active Workers</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {workLogs.filter(log => log.status === 'working' || log.status === 'break').length}
+                </p>
+              </div>
+              <Users className="text-orange-500" size={24} />
+            </div>
+          </div>
+
+          <div className="bg-white rounded-lg shadow p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Total Hours Today</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {workLogs
+                    .filter(log => {
+                      const today = new Date().toDateString();
+                      return new Date(log.startTime).toDateString() === today;
+                    })
+                    .reduce((total, log) => total + calculateWorkHours(log), 0)
+                    .toFixed(1)}
+                </p>
+              </div>
+              <Clock className="text-orange-500" size={24} />
+            </div>
+          </div>
+
+          <div className="bg-white rounded-lg shadow p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Completed Jobs</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {workLogs.filter(log => log.status === 'completed').length}
+                </p>
+              </div>
+              <BarChart3 className="text-orange-500" size={24} />
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg shadow">
+          <div className="px-6 py-4 border-b">
+            <h3 className="text-lg font-semibold">Recent Activity</h3>
+          </div>
+          <div className="divide-y">
+            {workLogs.slice(-5).reverse().map((log, index) => (
+              <div key={index} className="px-6 py-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium">{log.employeeName}</p>
+                    <p className="text-sm text-gray-600">
+                      {log.status === 'completed' ? 'Completed work' : 
+                       log.status === 'working' ? 'Started work' : 'On break'}
+                    </p>
+                    {log.workDescription && (
+                      <p className="text-xs text-gray-500 mt-1">{log.workDescription}</p>
+                    )}
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm text-gray-600">
+                      {new Date(log.startTime).toLocaleString()}
+                    </p>
+                    {log.status === 'completed' && (
+                      <p className="text-sm font-medium text-green-600">
+                        {calculateWorkHours(log).toFixed(1)}h
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+
+    const EmployeesTab = () => {
+      const getCurrentLocationForEmployee = (employeeId) => {
+        const activeSession = workLogs.find(log => 
+          log.employeeId === employeeId && 
+          (log.status === 'working' || log.status === 'break') &&
+          log.locationHistory && 
+          log.locationHistory.length > 0
+        );
+        
+        if (activeSession && activeSession.locationHistory.length > 0) {
+          const lastLocation = activeSession.locationHistory[activeSession.locationHistory.length - 1];
+          return lastLocation;
+        }
+        return null;
+      };
+
+      return (
+        <div className="space-y-4">
+          {employees.map(employee => {
+            const currentLocation = getCurrentLocationForEmployee(employee.id);
+            const activeSession = workLogs.find(log => 
+              log.employeeId === employee.id && 
+              (log.status === 'working' || log.status === 'break')
+            );
+            
+            return (
+              <div key={employee.id} className="bg-white rounded-lg shadow p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex-1">
+                    <h3 className="text-lg font-semibold">{employee.name}</h3>
+                    <p className="text-gray-600">{employee.email}</p>
+                    {currentLocation && currentLocation.latitude ? (
+                      <div className="mt-2 flex items-center">
+                        <MapPin className="text-orange-500 mr-1" size={14} />
+                        <span className="text-xs text-gray-600">
+                          {currentLocation.latitude.toFixed(6)}, {currentLocation.longitude.toFixed(6)}
+                        </span>
+                        <span className="text-xs text-gray-400 ml-2">
+                          ({new Date(currentLocation.timestamp).toLocaleTimeString()})
+                        </span>
+                      </div>
+                    ) : activeSession ? (
+                      <div className="mt-2 flex items-center">
+                        <MapPin className="text-red-500 mr-1" size={14} />
+                        <span className="text-xs text-red-500">Location unavailable</span>
+                      </div>
+                    ) : (
+                      <div className="mt-2 flex items-center">
+                        <MapPin className="text-gray-400 mr-1" size={14} />
+                        <span className="text-xs text-gray-400">Not working</span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm text-gray-600">This Month</p>
+                    <p className="text-2xl font-bold text-orange-500">
+                      {getTotalHoursThisMonth(employee.id).toFixed(1)}h
+                    </p>
+                    {activeSession && (
+                      <div className={`mt-1 px-2 py-1 rounded-full text-xs font-medium ${
+                        activeSession.status === 'working' ? 'bg-green-100 text-green-800' :
+                        'bg-yellow-100 text-yellow-800'
+                      }`}>
+                        {activeSession.status === 'working' ? 'Working' : 'On Break'}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                
+                <div className="space-y-2">
+                  {workLogs
+                    .filter(log => log.employeeId === employee.id)
+                    .slice(-3)
+                    .map((log, index) => (
+                      <div key={index} className="flex flex-col md:flex-row md:items-center md:justify-between text-sm border-b py-2">
+                        <div className="flex-1">
+                          <span>{new Date(log.startTime).toLocaleDateString()}</span>
+                          <span className={`ml-2 px-2 py-1 rounded-full text-xs ${
+                            log.status === 'completed' ? 'bg-green-100 text-green-800' :
+                            log.status === 'working' ? 'bg-blue-100 text-blue-800' :
+                            'bg-yellow-100 text-yellow-800'
+                          }`}>
+                            {log.status === 'completed' ? `${calculateWorkHours(log).toFixed(1)}h` : log.status}
+                          </span>
+                          {log.workDescription && (
+                            <div className="mt-2">
+                              <p className="text-xs text-gray-500">Work: {log.workDescription}</p>
+                            </div>
+                          )}
+                        </div>
+
+                        {log.locationHistory && log.locationHistory.length > 1 && (
+                          <div className="mt-2">
+                            <span className="block text-xs text-gray-500 mb-1">Location History:</span>
+                            <ul className="text-xs text-gray-700 list-disc ml-4">
+                              {log.locationHistory.map((loc, idx) => (
+                                <li key={idx}>
+                                  {loc.latitude ? `${loc.latitude.toFixed(6)}, ${loc.longitude.toFixed(6)}` : loc.error || 'No location'} ({new Date(loc.timestamp).toLocaleTimeString()})
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      );
+    };
+
+    const VehiclesTab = () => (
+      <div className="space-y-6">
+        <div className="bg-white rounded-lg shadow p-6">
+          <h3 className="text-lg font-semibold mb-4">Vehicle Fleet</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {vehicles.map(vehicle => {
+              const activeSession = workLogs.find(log => 
+                log.vehicle?.id === vehicle.id && 
+                (log.status === 'working' || log.status === 'break')
+              );
+              
+              return (
+                <div key={vehicle.id} className="bg-gray-50 rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center">
+                      <Car className="text-orange-500 mr-2" size={20} />
+                      <h4 className="font-semibold">{vehicle.name}</h4>
+                    </div>
+                    <div className={`px-2 py-1 rounded-full text-xs font-medium ${
+                      activeSession ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                    }`}>
+                      {activeSession ? 'In Use' : 'Available'}
+                    </div>
+                  </div>
+                  <p className="text-sm text-gray-600 mb-2">Plate: {vehicle.plate}</p>
+                  {activeSession && (
+                    <div className="text-xs text-gray-500">
+                      <p>Used by: {activeSession.employeeName}</p>
+                      <p>Fuel: {activeSession.gasAmount}L</p>
+                      <p>Since: {new Date(activeSession.startTime).toLocaleTimeString()}</p>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    );
+
+    const WorkFilesTab = () => {
+      const [fileFilter, setFileFilter] = useState('all');
+      const [selectedFiles, setSelectedFiles] = useState([]);
+      const [uploadDescription, setUploadDescription] = useState('');
+      const [uploadCategory, setUploadCategory] = useState('document');
+
+      const handleFileUploadClick = () => {
+        fileInputRef.current?.click();
+      };
+
+      const handleFileSelect = async (e) => {
+        const files = Array.from(e.target.files);
+        if (files.length > 0) {
+          try {
+            await handleFileUpload(files, uploadCategory, uploadDescription);
+            setUploadDescription('');
+            e.target.value = '';
+          } catch (error) {
+            console.error('File upload error:', error);
+          }
+        }
+      };
+
+      const handleBulkDelete = () => {
+        if (selectedFiles.length > 0 && window.confirm(`Delete ${selectedFiles.length} selected files?`)) {
+          selectedFiles.forEach(fileId => removeFileFromAppFiles(fileId));
+          setSelectedFiles([]);
+        }
+      };
+
+      const toggleFileSelection = (fileId) => {
+        setSelectedFiles(prev => 
+          prev.includes(fileId) 
+            ? prev.filter(id => id !== fileId)
+            : [...prev, fileId]
+        );
+      };
+
+      const getFilteredFiles = () => {
+        let filtered = appFiles.filter(file => file.status === 'active');
+        
+        if (fileFilter === 'screenshots') {
+          filtered = filtered.filter(file => file.category === 'screenshot');
+        } else if (fileFilter === 'documents') {
+          filtered = filtered.filter(file => file.category === 'document');
+        } else if (fileFilter === 'images') {
+          filtered = filtered.filter(file => file.fileType === 'image' && file.category !== 'screenshot');
+        } else if (fileFilter === 'my-uploads') {
+          filtered = filtered.filter(file => file.uploadedBy === currentUser.id);
+        }
+        
+        return filtered.sort((a, b) => new Date(b.uploadDate) - new Date(a.uploadDate));
+      };
+
+      const filteredFiles = getFilteredFiles();
+
+      return (
+        <div className="space-y-6">
+          {/* Upload Section */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <h3 className="text-lg font-semibold mb-4">Upload Files</h3>
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Category:</label>
+                  <select
+                    value={uploadCategory}
+                    onChange={(e) => setUploadCategory(e.target.value)}
+                    className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  >
+                    <option value="document">Document</option>
+                    <option value="image">Image</option>
+                    <option value="report">Report</option>
+                    <option value="contract">Contract</option>
+                    <option value="invoice">Invoice</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Description:</label>
+                  <input
+                    type="text"
+                    value={uploadDescription}
+                    onChange={(e) => setUploadDescription(e.target.value)}
+                    className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
+                    placeholder="File description..."
+                  />
+                </div>
+              </div>
+              <div className="flex items-center space-x-4">
+                <button
+                  onClick={handleFileUploadClick}
+                  className="bg-orange-500 text-white px-4 py-2 rounded-md hover:bg-orange-600 transition duration-200 flex items-center space-x-2"
+                >
+                  <Upload size={16} />
+                  <span>Upload Files</span>
+                </button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  multiple
+                  onChange={handleFileSelect}
+                  className="hidden"
+                  accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.jpg,.jpeg,.png,.gif,.bmp,.webp"
+                />
+                <span className="text-sm text-gray-500">
+                  Supports: PDF, Office documents, images
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Filters and Actions */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div className="flex items-center space-x-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Filter:</label>
+                  <select
+                    value={fileFilter}
+                    onChange={(e) => setFileFilter(e.target.value)}
+                    className="border px-3 py-2 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  >
+                    <option value="all">All Files</option>
+                    <option value="screenshots">Screenshots</option>
+                    <option value="documents">Documents</option>
+                    <option value="images">Images</option>
+                    <option value="my-uploads">My Uploads</option>
+                  </select>
+                </div>
+                <div className="text-sm text-gray-600">
+                  Total: {filteredFiles.length} files
+                </div>
+              </div>
+              
+              {selectedFiles.length > 0 && (
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm text-gray-600">
+                    {selectedFiles.length} selected
+                  </span>
+                  <button
+                    onClick={handleBulkDelete}
+                    className="bg-red-500 text-white px-3 py-1 rounded-md hover:bg-red-600 transition duration-200 flex items-center space-x-1"
+                  >
+                    <Trash2 size={14} />
+                    <span>Delete</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Files List */}
+          <div className="bg-white rounded-lg shadow">
+            <div className="px-6 py-4 border-b">
+              <h3 className="text-lg font-semibold">Files</h3>
+            </div>
+            <div className="divide-y">
+              {filteredFiles.length === 0 ? (
+                <div className="px-6 py-8 text-center text-gray-500">
+                  <File size={48} className="mx-auto mb-4 text-gray-300" />
+                  <p>No files found for the selected filter.</p>
+                </div>
+              ) : (
+                filteredFiles.map((file) => {
+                  const FileIcon = getFileIcon(file.mimeType, file.category);
+                  return (
+                    <div key={file.id} className="px-6 py-4 hover:bg-gray-50">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-4">
+                          <input
+                            type="checkbox"
+                            checked={selectedFiles.includes(file.id)}
+                            onChange={() => toggleFileSelection(file.id)}
+                            className="rounded border-gray-300 text-orange-500 focus:ring-orange-500"
+                          />
+                          <div 
+                            className="flex items-center space-x-3 flex-1 cursor-pointer"
+                            onClick={() => openFile(file)}
+                            title="Click to open file"
+                          >
+                            <FileIcon 
+                              size={24} 
+                              className={`${
+                                file.category === 'screenshot' ? 'text-purple-500' :
+                                file.fileType === 'image' ? 'text-blue-500' :
+                                'text-gray-500'
+                              }`}
+                            />
+                            <div>
+                              <p className="font-medium text-gray-900 hover:text-blue-600 transition duration-200">{file.originalName}</p>
+                              <div className="text-sm text-gray-500 space-x-2">
+                                <span>{formatFileSize(file.fileSize)}</span>
+                                <span>•</span>
+                                <span className="capitalize">{file.category}</span>
+                                <span>•</span>
+                                <span>{new Date(file.uploadDate).toLocaleDateString()}</span>
+                              </div>
+                              {file.description && (
+                                <p className="text-sm text-gray-600 mt-1">{file.description}</p>
+                              )}
+                              {file.relatedWorkSessionId && (
+                                <p className="text-xs text-orange-600 mt-1">
+                                  📋 Related to work session #{file.relatedWorkSessionId}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <div className="flex items-center space-x-2">
+                          <div className="text-right text-sm">
+                            <p className="text-gray-600">
+                              {file.uploadedByName} ({file.uploadedByType})
+                            </p>
+                            <p className="text-gray-500">
+                              {new Date(file.uploadDate).toLocaleString()}
+                            </p>
+                          </div>
+                          <div className="flex items-center space-x-1">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openFile(file);
+                              }}
+                              className="p-1 text-gray-500 hover:text-blue-500 transition duration-200"
+                              title="View file"
+                            >
+                              <Eye size={16} />
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                downloadFile(file);
+                              }}
+                              className="p-1 text-gray-500 hover:text-green-500 transition duration-200"
+                              title="Download file"
+                            >
+                              <Download size={16} />
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (window.confirm(`Delete "${file.originalName}"?`)) {
+                                  removeFileFromAppFiles(file.id);
+                                }
+                              }}
+                              className="p-1 text-gray-500 hover:text-red-500 transition duration-200"
+                              title="Delete file"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    const ReportsTab = () => (
+      <div className="space-y-6">
+        <div className="bg-white rounded-lg shadow p-6">
+          <h3 className="text-lg font-semibold mb-4">Monthly Report</h3>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b">
+                  <th className="text-left py-2">Employee</th>
+                  <th className="text-left py-2">Total Hours</th>
+                  <th className="text-left py-2">Days Worked</th>
+                  <th className="text-left py-2">Avg Hours/Day</th>
+                </tr>
+              </thead>
+              <tbody>
+                {employees.map(employee => {
+                  const totalHours = getTotalHoursThisMonth(employee.id);
+                  const daysWorked = new Set(
+                    workLogs
+                      .filter(log => log.employeeId === employee.id && log.status === 'completed')
+                      .map(log => new Date(log.startTime).toDateString())
+                  ).size;
+                  const avgHours = daysWorked > 0 ? totalHours / daysWorked : 0;
+                  
+                  return (
+                    <tr key={employee.id} className="border-b">
+                      <td className="py-2 font-medium">{employee.name}</td>
+                      <td className="py-2">{totalHours.toFixed(1)}h</td>
+                      <td className="py-2">{daysWorked}</td>
+                      <td className="py-2">{avgHours.toFixed(1)}h</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    );
+
+    const WorkHistoryTab = () => {
+      const [selectedEmployee, setSelectedEmployee] = useState('all');
+      const [dateFilter, setDateFilter] = useState('all');
+      
+      const getFilteredWorkLogs = () => {
+        let filtered = workLogs.filter(log => log.status === 'completed');
+        
+        if (selectedEmployee !== 'all') {
+          filtered = filtered.filter(log => log.employeeId === parseInt(selectedEmployee));
+        }
+        
+        if (dateFilter === 'today') {
+          const today = new Date().toDateString();
+          filtered = filtered.filter(log => new Date(log.startTime).toDateString() === today);
+        } else if (dateFilter === 'week') {
+          const weekAgo = new Date();
+          weekAgo.setDate(weekAgo.getDate() - 7);
+          filtered = filtered.filter(log => new Date(log.startTime) >= weekAgo);
+        } else if (dateFilter === 'month') {
+          const monthAgo = new Date();
+          monthAgo.setMonth(monthAgo.getMonth() - 1);
+          filtered = filtered.filter(log => new Date(log.startTime) >= monthAgo);
+        }
+        
+        return filtered.sort((a, b) => new Date(b.startTime) - new Date(a.startTime));
+      };
+
+      return (
+        <div className="space-y-6">
+          <div className="bg-white rounded-lg shadow p-6">
+            <h3 className="text-lg font-semibold mb-4">Work History</h3>
+            <div className="flex flex-wrap gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Employee:</label>
+                <select
+                  value={selectedEmployee}
+                  onChange={(e) => setSelectedEmployee(e.target.value)}
+                  className="border px-3 py-2 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
+                >
+                  <option value="all">All Employees</option>
+                  {employees.map(employee => (
+                    <option key={employee.id} value={employee.id}>{employee.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Date Range:</label>
+                <select
+                  value={dateFilter}
+                  onChange={(e) => setDateFilter(e.target.value)}
+                  className="border px-3 py-2 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
+                >
+                  <option value="all">All Time</option>
+                  <option value="today">Today</option>
+                  <option value="week">Last 7 Days</option>
+                  <option value="month">Last 30 Days</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-lg shadow">
+            <div className="px-6 py-4 border-b">
+              <h3 className="text-lg font-semibold">Completed Work Sessions</h3>
+            </div>
+            <div className="divide-y">
+              {getFilteredWorkLogs().map((log, index) => (
+                <div key={index} className="px-6 py-4">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center space-x-3">
+                        <h4 className="font-semibold text-lg">{log.employeeName}</h4>
+                        <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">
+                          {calculateWorkHours(log).toFixed(1)}h
+                        </span>
+                      </div>
+                      <p className="text-sm text-gray-600 mt-1">
+                        {new Date(log.startTime).toLocaleDateString()} - {new Date(log.endTime).toLocaleDateString()}
+                      </p>
+                      <p className="text-sm text-gray-600">
+                        {new Date(log.startTime).toLocaleTimeString()} - {new Date(log.endTime).toLocaleTimeString()}
+                      </p>
+                      {log.workDescription && (
+                        <div className="mt-2">
+                          <p className="text-sm font-medium text-gray-700">Work Description:</p>
+                          <p className="text-sm text-gray-600 bg-gray-50 p-2 rounded mt-1">{log.workDescription}</p>
+                        </div>
+                      )}
+                      {log.vehicle && (
+                        <p className="text-sm text-gray-600 mt-1">
+                          <span className="font-medium">Vehicle:</span> {log.vehicle.name} ({log.vehicle.plate})
+                        </p>
+                      )}
+                      {log.gasAmount > 0 && (
+                        <p className="text-sm text-gray-600">
+                          <span className="font-medium">Gas Used:</span> {log.gasAmount}L
+                        </p>
+                      )}
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xs text-gray-500">
+                        {log.breaks.length} breaks taken
+                      </p>
+                      {log.locationHistory && log.locationHistory.length > 0 && (
+                        <p className="text-xs text-gray-500 mt-1">
+                          {log.locationHistory.length} location updates
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {getFilteredWorkLogs().length === 0 && (
+                <div className="px-6 py-8 text-center text-gray-500">
+                  <p>No completed work sessions found for the selected filters.</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    const MapTab = () => {
+      const [selectedWorker, setSelectedWorker] = useState(null);
+      const [mapCenter, setMapCenter] = useState(null);
+      const [mapZoom, setMapZoom] = useState(12);
+      
+      const activeSessions = workLogs.filter(log => (log.status === 'working' || log.status === 'break') && log.locationHistory && log.locationHistory.length > 0);
+      
+      const defaultCenter = activeSessions.length > 0 && activeSessions[0].locationHistory[activeSessions[0].locationHistory.length-1].latitude
+        ? {
+            lat: activeSessions[0].locationHistory[activeSessions[0].locationHistory.length-1].latitude,
+            lng: activeSessions[0].locationHistory[activeSessions[0].locationHistory.length-1].longitude
+          }
+        : { lat: 41.9981, lng: 21.4254 };
+
+      const { isLoaded } = useJsApiLoader({
+        googleMapsApiKey: GOOGLE_MAPS_API_KEY
+      });
+
+      const handleMarkerClick = (worker) => {
+        const lastLoc = worker.locationHistory[worker.locationHistory.length - 1];
+        if (lastLoc && lastLoc.latitude) {
+          setSelectedWorker(worker);
+          setMapCenter({ lat: lastLoc.latitude, lng: lastLoc.longitude });
+          setMapZoom(15);
+        }
+      };
+
+      const clearSelection = () => {
+        setSelectedWorker(null);
+        setMapCenter(null);
+        setMapZoom(12);
+      };
+
+      return (
+        <div className="space-y-4">
+          {selectedWorker && (
+            <div className="bg-white rounded-lg shadow p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-semibold text-orange-600">{selectedWorker.employeeName}</h3>
+                  <p className="text-sm text-gray-600">
+                    Status: <span className={`font-medium ${
+                      selectedWorker.status === 'working' ? 'text-green-600' : 'text-yellow-600'
+                    }`}>
+                      {selectedWorker.status === 'working' ? 'Working' : 'On Break'}
+                    </span>
+                  </p>
+                  <p className="text-sm text-gray-600">
+                    Started: {new Date(selectedWorker.startTime).toLocaleString()}
+                  </p>
+                  {selectedWorker.workDescription && (
+                    <p className="text-sm text-gray-600 mt-1">
+                      <span className="font-medium">Work:</span> {selectedWorker.workDescription}
+                    </p>
+                  )}
+                  {selectedWorker.vehicle && (
+                    <p className="text-sm text-gray-600">
+                      <span className="font-medium">Vehicle:</span> {selectedWorker.vehicle.name} ({selectedWorker.vehicle.plate})
+                    </p>
+                  )}
+                </div>
+                <button
+                  onClick={clearSelection}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div className="w-full h-[500px] bg-gray-200 rounded-lg overflow-hidden">
+            {isLoaded ? (
+              <GoogleMap
+                mapContainerStyle={{ width: '100%', height: '100%' }}
+                center={mapCenter || defaultCenter}
+                zoom={mapZoom}
+              >
+                {activeSessions.map((log, idx) => {
+                  const lastLoc = log.locationHistory[log.locationHistory.length-1];
+                  if (!lastLoc.latitude) return null;
+                  
+                  const flagIcon = {
+                    url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
+                      <svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+                        <defs>
+                          <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
+                            <feDropShadow dx="1" dy="1" stdDeviation="2" flood-color="rgba(0,0,0,0.3)"/>
+                          </filter>
+                        </defs>
+                        <g filter="url(#shadow)">
+                          <rect x="14" y="8" width="2" height="20" fill="#8B4513" stroke="#654321" stroke-width="0.5"/>
+                          <rect x="16" y="8" width="12" height="8" fill="#FF0000" stroke="#CC0000" stroke-width="0.5"/>
+                          <rect x="16" y="8" width="12" height="2" fill="#FFFFFF"/>
+                          <rect x="16" y="12" width="12" height="2" fill="#FFFFFF"/>
+                          <circle cx="15" cy="28" r="2" fill="#654321" stroke="#8B4513" stroke-width="0.5"/>
+                        </g>
+                      </svg>
+                    `)}`,
+                    scaledSize: { width: 32, height: 32 },
+                    anchor: { x: 15, y: 28 },
+                    labelOrigin: { x: 15, y: 20 }
+                  };
+                  
+                  return (
+                    <Marker
+                      key={log.id}
+                      position={{ lat: lastLoc.latitude, lng: lastLoc.longitude }}
+                      icon={flagIcon}
+                      label={{
+                        text: log.employeeName[0],
+                        className: "marker-label",
+                        color: "#FFFFFF",
+                        fontSize: "12px",
+                        fontWeight: "bold"
+                      }}
+                      title={`${log.employeeName} (Last update: ${new Date(lastLoc.timestamp).toLocaleTimeString()})`}
+                      onClick={() => handleMarkerClick(log)}
+                    />
+                  );
+                })}
+              </GoogleMap>
+            ) : (
+              <div className="flex items-center justify-center h-full text-gray-600">Loading map...</div>
+            )}
+          </div>
+
+          <div className="bg-white rounded-lg shadow p-4">
+            <h3 className="text-lg font-semibold mb-3">Active Workers</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {activeSessions.map((worker) => {
+                const lastLoc = worker.locationHistory[worker.locationHistory.length - 1];
+                return (
+                  <button
+                    key={worker.id}
+                    onClick={() => handleMarkerClick(worker)}
+                    className={`p-3 rounded-lg border-2 transition-all ${
+                      selectedWorker?.id === worker.id 
+                        ? 'border-orange-500 bg-orange-50' 
+                        : 'border-gray-200 hover:border-orange-300 hover:bg-orange-50'
+                    }`}
+                  >
+                    <div className="text-left">
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold">{worker.employeeName}</span>
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                          worker.status === 'working' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+                        }`}>
+                          {worker.status === 'working' ? 'Working' : 'Break'}
+                        </span>
+                      </div>
+                      {lastLoc && lastLoc.latitude ? (
+                        <p className="text-xs text-gray-600 mt-1">
+                          📍 {lastLoc.latitude.toFixed(4)}, {lastLoc.longitude.toFixed(4)}
+                        </p>
+                      ) : (
+                        <p className="text-xs text-red-500 mt-1">📍 Location unavailable</p>
+                      )}
+                      <p className="text-xs text-gray-500 mt-1">
+                        Last update: {lastLoc ? new Date(lastLoc.timestamp).toLocaleTimeString() : 'Never'}
+                      </p>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+            {activeSessions.length === 0 && (
+              <p className="text-gray-500 text-center py-4">No active workers at the moment</p>
+            )}
+          </div>
+        </div>
+      );
+    };
+
+    const LocationHistoryTab = () => {
+      const logsByDate = workLogs.filter(log => {
+        const logDate = new Date(log.startTime).toISOString().slice(0, 10);
+        return logDate === selectedDate;
+      });
+      
+      return (
+        <div>
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Select Date:</label>
+            <input
+              type="date"
+              value={selectedDate}
+              onChange={e => setSelectedDate(e.target.value)}
+              className="border px-2 py-1 rounded"
+            />
+          </div>
+          {employees.map(employee => {
+            const logs = logsByDate.filter(log => log.employeeId === employee.id && log.locationHistory && log.locationHistory.length > 0);
+            return (
+              <div key={employee.id} className="mb-6 bg-white rounded-lg shadow p-4">
+                <h3 className="text-lg font-semibold mb-2">{employee.name}</h3>
+                {logs.length === 0 ? (
+                  <p className="text-gray-500 text-sm">No location history for this day.</p>
+                ) : (
+                  logs.map((log, idx) => (
+                    <div key={idx} className="mb-2">
+                      <span className="block text-xs text-gray-500 mb-1">Session started: {new Date(log.startTime).toLocaleString()}</span>
+                      <ul className="text-xs text-gray-700 list-disc ml-4">
+                        {log.locationHistory.map((loc, i) => (
+                          <li key={i}>
+                            {loc.latitude ? `${loc.latitude.toFixed(6)}, ${loc.longitude.toFixed(6)}` : loc.error || 'No location'} ({new Date(loc.timestamp).toLocaleTimeString()})
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))
+                )}
+              </div>
+            );
+          })}
+        </div>
+      );
+    };
+
+    return (
+      <div className="flex h-screen bg-gray-100">
+        {/* Sidebar */}
+        <div className="w-64 bg-white shadow-lg">
+          {/* Header */}
+          <div className="p-4 border-b bg-orange-500">
+            <h1 className="text-xl font-bold text-white">Admin Dashboard</h1>
+          </div>
+
+          {/* Fuel Panel */}
+          <div className="p-4 border-b">
+            <h3 className="text-sm font-semibold text-gray-700 mb-3">Fuel Panel (Liters)</h3>
+            <div className="space-y-2">
+              {employees.map(employee => {
+                const activeSession = workLogs.find(log => log.employeeId === employee.id && (log.status === 'working' || log.status === 'break'));
+                return (
+                  <div key={employee.id} className="flex justify-between text-xs">
+                    <span className="font-medium">{employee.name}</span>
+                    <span className="text-gray-600">{activeSession ? activeSession.gasAmount : '-'}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Navigation */}
+          <nav className="p-4">
+            <ul className="space-y-2">
+              {[
+                { id: 'overview', label: 'Overview', icon: BarChart3 },
+                { id: 'employees', label: 'Employees', icon: Users },
+                { id: 'vehicles', label: 'Vehicles', icon: Car },
+                { id: 'workFiles', label: 'Work Files', icon: FileText },
+                { id: 'reports', label: 'Reports', icon: Calendar },
+                { id: 'workHistory', label: 'Work History', icon: Calendar },
+                { id: 'map', label: 'Map', icon: MapPin },
+                { id: 'locationHistory', label: 'Location History', icon: MapPin }
+              ].map((tab) => (
+                <li key={tab.id}>
+                  <button
+                    onClick={() => setActiveTab(tab.id)}
+                    className={`w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      activeTab === tab.id
+                        ? 'bg-orange-100 text-orange-600'
+                        : 'text-gray-700 hover:bg-gray-100'
+                    }`}
+                  >
+                    <tab.icon size={18} />
+                    <span>{tab.label}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </nav>
+
+          {/* Logout */}
+          <div className="absolute bottom-4 left-4 right-4">
+            <button
+              onClick={() => {
+                setCurrentUser(null);
+                setCurrentView('login');
+              }}
+              className="w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100 transition-colors"
+            >
+              <LogOut size={18} />
+              <span>Logout</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Main Content */}
+        <div className="flex-1 overflow-auto">
+          <div className="p-6">
+            {activeTab === 'overview' && <OverviewTab />}
+            {activeTab === 'employees' && <EmployeesTab />}
+            {activeTab === 'vehicles' && <VehiclesTab />}
+            {activeTab === 'workFiles' && <WorkFilesTab />}
+            {activeTab === 'reports' && <ReportsTab />}
+            {activeTab === 'workHistory' && <WorkHistoryTab />}
+            {activeTab === 'map' && <MapTab />}
+            {activeTab === 'locationHistory' && <LocationHistoryTab />}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // File Preview Modal Component
+  const FilePreviewModal = () => {
+    if (!previewFile) return null;
+
+    useEffect(() => {
+      const handleEsc = (e) => {
+        if (e.key === 'Escape') {
+          setPreviewFile(null);
+        }
+      };
+      document.addEventListener('keydown', handleEsc);
+      return () => document.removeEventListener('keydown', handleEsc);
+    }, []);
+
+    return (
+      <div 
+        className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 z-50"
+        onClick={() => setPreviewFile(null)}
+      >
+        <div 
+          className="bg-white rounded-lg max-w-4xl max-h-[90vh] w-full overflow-hidden"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="px-6 py-4 border-b bg-gray-50">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">{previewFile.originalName}</h3>
+                <div className="text-sm text-gray-600 mt-1">
+                  <span>{formatFileSize(previewFile.fileSize)}</span>
+                  <span className="mx-2">•</span>
+                  <span>Uploaded by {previewFile.uploadedByName} ({previewFile.uploadedByType})</span>
+                  <span className="mx-2">•</span>
+                  <span>{new Date(previewFile.uploadDate).toLocaleString()}</span>
+                </div>
+                {previewFile.description && (
+                  <p className="text-sm text-gray-600 mt-1">{previewFile.description}</p>
+                )}
+              </div>
+              <button
+                onClick={() => setPreviewFile(null)}
+                className="text-gray-500 hover:text-gray-700 p-2"
+                title="Close"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+
+          <div className="p-6 overflow-auto max-h-[calc(90vh-120px)]">
+            <div className="flex justify-center">
+              <img 
+                src={previewFile.filePath} 
+                alt={previewFile.originalName}
+                className="max-w-full max-h-full rounded-lg shadow-lg"
+                style={{ maxHeight: '70vh' }}
+              />
+            </div>
+          </div>
+
+          <div className="px-6 py-4 border-t bg-gray-50 flex justify-end space-x-3">
+            <button
+              onClick={() => downloadFile(previewFile)}
+              className="bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600 transition duration-200 flex items-center space-x-2"
+            >
+              <Download size={16} />
+              <span>Download</span>
+            </button>
+            <button
+              onClick={() => {
+                window.open(previewFile.filePath, '_blank');
+              }}
+              className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 transition duration-200 flex items-center space-x-2"
+            >
+              <Eye size={16} />
+              <span>Open in New Tab</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Main render
+  if (currentView === 'splash') {
+    return <SplashScreen />;
+  }
+
+  if (currentView === 'login') {
+    return <LoginForm />;
+  }
+
+  if (currentView === 'admin') {
+    return (
+      <>
+        <AdminDashboard />
+        <FilePreviewModal />
+      </>
+    );
+  }
+
+  if (currentView === 'employee') {
+    return (
+      <>
+        <EmployeeDashboard />
+        <FilePreviewModal />
+      </>
+    );
+  }
+
+  return null;
+};
+
+export default EmployeeTrackingApp;

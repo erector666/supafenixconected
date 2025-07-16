@@ -1,0 +1,13 @@
+{
+  "id": 6,
+  "name": "Vane",
+  "email": "vane@fenix.com",
+  "password": "admin123",
+  "role": "worker",
+  "phone": "+389-70-678-901",
+  "department": "Construction",
+  "hire_date": "2024-01-06",
+  "status": "active",
+  "created_at": "2024-01-06T00:00:00Z",
+  "updated_at": "2024-01-06T00:00:00Z"
+} 

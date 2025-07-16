@@ -1,0 +1,13 @@
+{
+  "id": 4,
+  "name": "Dragan",
+  "email": "dragan@fenix.com",
+  "password": "admin123",
+  "role": "worker",
+  "phone": "+389-70-456-789",
+  "department": "Construction",
+  "hire_date": "2024-01-04",
+  "status": "active",
+  "created_at": "2024-01-04T00:00:00Z",
+  "updated_at": "2024-01-04T00:00:00Z"
+} 
