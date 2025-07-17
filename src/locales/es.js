@@ -76,6 +76,8 @@ export default {
   pressEnter: 'Presione Enter para iniciar sesión',
   employeeLogin: 'Inicio de sesión de Empleado',
   adminLogin: 'Inicio de sesión de Administrador',
+  rememberMe: 'Recuérdame',
+  loggingIn: 'Iniciando sesión...',
 
   // Employee Dashboard
   employeeDashboard: 'Panel de control del Empleado',

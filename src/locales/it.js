@@ -76,6 +76,8 @@ export default {
   pressEnter: 'Premi Invio per accedere',
   employeeLogin: 'Accesso Dipendente',
   adminLogin: 'Accesso Amministratore',
+  rememberMe: 'Ricordami',
+  loggingIn: 'Accesso in corso...',
 
   // Employee Dashboard
   employeeDashboard: 'Dashboard Dipendente',

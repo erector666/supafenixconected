@@ -76,6 +76,8 @@ export default {
   pressEnter: 'Притиснете Enter за најавување',
   employeeLogin: 'Најавување на вработен',
   adminLogin: 'Најавување на администратор',
+  rememberMe: 'Запомни ме',
+  loggingIn: 'Се најавувам...',
 
   // Employee Dashboard
   employeeDashboard: 'Контролна табла на вработен',

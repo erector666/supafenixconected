@@ -76,6 +76,8 @@ export default {
   pressEnter: 'Appuyez sur Entrée pour vous connecter',
   employeeLogin: 'Connexion Employé',
   adminLogin: 'Connexion Administrateur',
+  rememberMe: 'Se souvenir de moi',
+  loggingIn: 'Connexion en cours...',
 
   // Employee Dashboard
   employeeDashboard: 'Tableau de bord Employé',

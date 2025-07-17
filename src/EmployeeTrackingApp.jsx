@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Clock, MapPin, Camera, Play, Pause, Square, Car, Users, Calendar, BarChart3, Settings, LogOut, Upload, FileText, Image, Download, Trash2, Eye, File, Package } from 'lucide-react';
+import { Clock, MapPin, Camera, Play, Pause, Square, Car, Users, Calendar, BarChart3, Settings, LogOut, Upload, FileText, Image, Download, Trash2, Eye, File, Package, RefreshCw } from 'lucide-react';
 import { GoogleMap, Marker, useJsApiLoader } from '@react-google-maps/api';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
@@ -9,6 +9,7 @@ import { I18nProvider, useI18n } from './contexts/I18nContext';
 import LanguageSelector from './components/LanguageSelector';
 import employeeService from './services/employeeService';
 import vehicleService from './services/vehicleService';
+import sessionService from './services/sessionService';
 
 const EmployeeTrackingAppContent = () => {
   const { t, currentLanguage } = useI18n();
@@ -24,34 +25,7 @@ const EmployeeTrackingAppContent = () => {
   const [vehicles, setVehicles] = useState([]);
 
   // Materials State
-  const [materials, setMaterials] = useState([
-    { 
-      id: 1, 
-      name: 'Cement Bags', 
-      quantity: 50, 
-      unit: 'bags', 
-      price: 15.50, 
-      project: 'Skopje Mall Construction', 
-      worksite: 'Skopje Center', 
-      purchaseDate: '2024-01-10', 
-      supplier: 'Beton Pro', 
-      receiptFile: null,
-      description: 'Portland cement for foundation work'
-    },
-    { 
-      id: 2, 
-      name: 'Steel Rebar', 
-      quantity: 200, 
-      unit: 'pieces', 
-      price: 8.75, 
-      project: 'Residential Complex', 
-      worksite: 'Aerodrom District', 
-      purchaseDate: '2024-01-12', 
-      supplier: 'Metal Solutions', 
-      receiptFile: null,
-      description: 'Reinforcement steel for concrete structures'
-    }
-  ]);
+  const [materials, setMaterials] = useState([]);
 
   // App Files State
   const [appFiles, setAppFiles] = useState([]);
@@ -63,34 +37,82 @@ const EmployeeTrackingAppContent = () => {
   const [employeeLocations, setEmployeeLocations] = useState({});
   const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
 
-  // Load employees data from Supabase on component mount
+  // Auto-login and load employees data on component mount
   useEffect(() => {
-    const loadEmployees = async () => {
+    const initializeApp = async () => {
       try {
+        // Try auto-login first
+        console.log('🔄 Attempting auto-login...');
+        const savedUser = await sessionService.autoLogin();
+        
+        if (savedUser) {
+          console.log('✅ Auto-login successful:', savedUser.name);
+          setCurrentUser(savedUser);
+          setIsAdmin(savedUser.role === 'admin');
+          setCurrentView(savedUser.role === 'admin' ? 'admin' : 'employee');
+          
+          if (savedUser.role !== 'admin') {
+            getCurrentLocation();
+          }
+        } else {
+          console.log('❌ No valid session found, showing login screen');
+        }
+
+        // Load employees data
         const employeesData = await employeeService.getAllEmployees();
         setEmployees(employeesData);
       } catch (error) {
-        console.error('Error loading employees:', error);
+        console.error('Error during app initialization:', error);
         setEmployees([]);
       }
     };
     
-    loadEmployees();
+    initializeApp();
   }, []);
 
-  // Load vehicles data from Supabase on component mount
+  // Load vehicles data from Supabase on component mount and subscribe to real-time changes
   useEffect(() => {
     const loadVehicles = async () => {
       try {
+        console.log('🚗 Loading vehicles from database...');
         const vehiclesData = await vehicleService.getAllVehicles();
+        console.log('✅ Vehicles loaded:', vehiclesData);
         setVehicles(vehiclesData);
       } catch (error) {
-        console.error('Error loading vehicles:', error);
+        console.error('❌ Error loading vehicles:', error);
+        console.error('Error details:', JSON.stringify(error, null, 2));
         setVehicles([]);
       }
     };
     
     loadVehicles();
+
+    // Subscribe to real-time vehicle changes
+    const subscription = vehicleService.subscribeToVehicles((payload) => {
+      console.log('🔄 Real-time vehicle update received:', payload);
+      
+      if (payload.eventType === 'INSERT') {
+        // New vehicle added
+        setVehicles(prev => [...prev, payload.new]);
+        console.log('✅ New vehicle added to state:', payload.new);
+      } else if (payload.eventType === 'UPDATE') {
+        // Vehicle updated
+        setVehicles(prev => prev.map(vehicle => 
+          vehicle.id === payload.new.id ? payload.new : vehicle
+        ));
+        console.log('✅ Vehicle updated in state:', payload.new);
+      } else if (payload.eventType === 'DELETE') {
+        // Vehicle deleted
+        setVehicles(prev => prev.filter(vehicle => vehicle.id !== payload.old.id));
+        console.log('✅ Vehicle removed from state:', payload.old);
+      }
+    });
+
+    // Cleanup subscription on unmount
+    return () => {
+      console.log('🧹 Cleaning up vehicle subscription...');
+      vehicleService.unsubscribeFromVehicles();
+    };
   }, []);
 
   // File Management Functions
@@ -244,13 +266,26 @@ const EmployeeTrackingAppContent = () => {
   const LoginForm = () => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [rememberMe, setRememberMe] = useState(false);
+    const [isLoggingIn, setIsLoggingIn] = useState(false);
 
     const handleLogin = async () => {
       try {
+        setIsLoggingIn(true);
+        console.log('🔐 Attempting login for:', email);
+        console.log('🔐 Remember me state:', rememberMe);
+        console.log('🔐 Remember me type:', typeof rememberMe);
+        
         // Validate credentials using Supabase service
         const employee = await employeeService.validateCredentials(email, password);
         
         if (employee) {
+          console.log('✅ Login successful, creating session...');
+          console.log('🔐 Creating session with rememberMe:', rememberMe);
+          
+          // Create session for remember me functionality
+          await sessionService.createSession(employee.id, rememberMe);
+          
           setCurrentUser(employee);
           setIsAdmin(employee.role === 'admin');
           setCurrentView(employee.role === 'admin' ? 'admin' : 'employee');
@@ -258,12 +293,16 @@ const EmployeeTrackingAppContent = () => {
           if (employee.role !== 'admin') {
             getCurrentLocation();
           }
+          
+          console.log('✅ User logged in successfully:', employee.name);
         } else {
           alert('Invalid credentials');
         }
       } catch (error) {
-        console.error('Login error:', error);
+        console.error('❌ Login error:', error);
         alert('Login failed. Please try again.');
+      } finally {
+        setIsLoggingIn(false);
       }
     };
 
@@ -278,13 +317,11 @@ const EmployeeTrackingAppContent = () => {
         <div className="bg-white rounded-lg shadow-xl p-8 w-full max-w-md">
           <div className="text-center mb-8">
             <div className="mb-6 relative">
-              <img src="/logo.png" alt="FENIX Logo" className="mx-auto w-48 h-24 object-contain" />
+              <img src="/logo.png" alt="FENIX Logo" className="mx-auto w-[512px] h-[256px] object-contain" />
               <div className="absolute top-0 right-0 transform -translate-y-1 translate-x-2">
                 <LanguageSelector />
               </div>
             </div>
-            <h1 className="text-4xl font-bold text-gray-800 mb-2">FENIX</h1>
-            <p className="text-gray-600">{t('appName')}</p>
           </div>
           
           <div className="space-y-6">
@@ -313,11 +350,42 @@ const EmployeeTrackingAppContent = () => {
               />
             </div>
             
+            <div className="flex items-center">
+              <input
+                id="remember-me"
+                type="checkbox"
+                checked={rememberMe}
+                onChange={(e) => {
+                  console.log('🔘 Checkbox changed:', e.target.checked);
+                  setRememberMe(e.target.checked);
+                }}
+                className="h-4 w-4 text-orange-600 focus:ring-orange-500 border-gray-300 rounded"
+              />
+              <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-700">
+                {t('rememberMe')}
+              </label>
+            </div>
+            
             <button
               onClick={handleLogin}
-              className="w-full bg-orange-500 text-white py-2 px-4 rounded-md hover:bg-orange-600 transition duration-200"
+              disabled={isLoggingIn}
+              className={`w-full py-2 px-4 rounded-md transition duration-200 flex items-center justify-center ${
+                isLoggingIn 
+                  ? 'bg-gray-400 text-gray-600 cursor-not-allowed' 
+                  : 'bg-orange-500 text-white hover:bg-orange-600'
+              }`}
             >
-              {t('loginButton')}
+              {isLoggingIn ? (
+                <>
+                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  {t('loggingIn')}
+                </>
+              ) : (
+                t('loginButton')
+              )}
             </button>
           </div>
           
@@ -334,6 +402,7 @@ const EmployeeTrackingAppContent = () => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
+          console.log('Location obtained:', position.coords);
           setLocation({
             latitude: position.coords.latitude,
             longitude: position.coords.longitude,
@@ -343,9 +412,20 @@ const EmployeeTrackingAppContent = () => {
         (error) => {
           console.error('Error getting location:', error);
           setLocation({ error: 'Location not available' });
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 15000,
+          maximumAge: 0
         }
       );
     }
+  };
+
+  // Force refresh location
+  const forceRefreshLocation = () => {
+    console.log('Force refreshing location...');
+    getCurrentLocation();
   };
 
   // Continuous location tracking
@@ -359,6 +439,7 @@ const EmployeeTrackingAppContent = () => {
       // Set up continuous location tracking
       watchId = navigator.geolocation.watchPosition(
         (position) => {
+          console.log('Location update:', position.coords);
           const newLocation = {
             latitude: position.coords.latitude,
             longitude: position.coords.longitude,
@@ -403,9 +484,31 @@ const EmployeeTrackingAppContent = () => {
     const [showEndWorkModal, setShowEndWorkModal] = useState(false);
     const [finalWorkDescription, setFinalWorkDescription] = useState('');
     const [finalPhotoTaken, setFinalPhotoTaken] = useState(false);
+    const [isRefreshingVehicles, setIsRefreshingVehicles] = useState(false);
+    const [showVehicleRefreshNotification, setShowVehicleRefreshNotification] = useState(false);
+
+    // Function to refresh vehicles when modal opens
+    const refreshVehiclesForModal = async () => {
+      try {
+        setIsRefreshingVehicles(true);
+        console.log('🔄 Refreshing vehicles for worker modal...');
+        const freshVehicles = await vehicleService.getAllVehicles();
+        console.log('✅ Fresh vehicles loaded for modal:', freshVehicles);
+        setVehicles(freshVehicles);
+        // Show notification that vehicles were refreshed
+        setShowVehicleRefreshNotification(true);
+        setTimeout(() => setShowVehicleRefreshNotification(false), 3000);
+      } catch (error) {
+        console.error('❌ Error refreshing vehicles for modal:', error);
+      } finally {
+        setIsRefreshingVehicles(false);
+      }
+    };
 
     const startWork = () => {
       if (!selectedVehicle) {
+        // Refresh vehicles before opening modal to ensure latest data
+        refreshVehiclesForModal();
         setShowVehicleModal(true);
         return;
       }
@@ -675,12 +778,32 @@ const EmployeeTrackingAppContent = () => {
             <div className="flex items-center space-x-3">
               <LanguageSelector />
               <button
-                onClick={() => {
-                  setCurrentUser(null);
-                  setCurrentView('login');
-                  setWorkSession(null);
+                onClick={async () => {
+                  try {
+                    console.log('🚪 Logging out employee...');
+                    
+                    // Clear session from database
+                    const sessionToken = sessionService.getCurrentSessionToken();
+                    if (sessionToken) {
+                      await sessionService.deleteSession(sessionToken);
+                    }
+                    
+                    // Clear app state
+                    setCurrentUser(null);
+                    setCurrentView('login');
+                    setWorkSession(null);
+                    
+                    console.log('✅ Employee logout successful');
+                  } catch (error) {
+                    console.error('❌ Error during employee logout:', error);
+                    // Still clear app state even if session deletion fails
+                    setCurrentUser(null);
+                    setCurrentView('login');
+                    setWorkSession(null);
+                  }
                 }}
                 className="text-gray-500 hover:text-gray-700"
+                title={t('logout')}
               >
                 <LogOut size={20} />
               </button>
@@ -999,6 +1122,17 @@ const EmployeeTrackingAppContent = () => {
 
         {/* Weather Widget - Moved to bottom */}
         <div className="mt-4">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-sm font-medium text-gray-700">Location & Weather</h3>
+            <button
+              onClick={forceRefreshLocation}
+              className="text-xs bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600 transition duration-200 flex items-center space-x-1"
+              title="Refresh location"
+            >
+              <RefreshCw size={12} />
+              <span>Refresh</span>
+            </button>
+          </div>
           <WeatherWidget location={location ? `${location.latitude?.toFixed(2)}, ${location.longitude?.toFixed(2)}` : 'Current Location'} />
         </div>
 
@@ -1006,7 +1140,24 @@ const EmployeeTrackingAppContent = () => {
         {showVehicleModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
             <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-              <h3 className="text-lg font-semibold mb-4">Select Vehicle & Gas</h3>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold">Select Vehicle & Gas</h3>
+                <button
+                  onClick={refreshVehiclesForModal}
+                  disabled={isRefreshingVehicles}
+                  className={`px-3 py-1 rounded-md transition duration-200 flex items-center space-x-1 text-sm ${
+                    isRefreshingVehicles 
+                      ? 'bg-gray-400 text-gray-600 cursor-not-allowed' 
+                      : 'bg-blue-500 text-white hover:bg-blue-600'
+                  }`}
+                  title="Refresh vehicle list"
+                >
+                  <svg className={`w-4 h-4 ${isRefreshingVehicles ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  <span>{isRefreshingVehicles ? 'Refreshing...' : 'Refresh'}</span>
+                </button>
+              </div>
               
               <div className="space-y-4">
                 <div>
@@ -1128,6 +1279,18 @@ const EmployeeTrackingAppContent = () => {
                   </button>
                 </div>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Vehicle Refresh Notification */}
+        {showVehicleRefreshNotification && (
+          <div className="fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-50">
+            <div className="flex items-center space-x-2">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+              <span>Vehicle list updated!</span>
             </div>
           </div>
         )}
@@ -1611,40 +1774,81 @@ const EmployeeTrackingAppContent = () => {
       };
       const handleVehicleSave = async () => {
         try {
+          console.log('🚗 Starting vehicle save operation...');
+          console.log('📝 Current newVehicle state:', newVehicle);
+          console.log('🔧 Editing vehicle:', editingVehicle);
+          
+          // Validate required fields
+          if (!newVehicle.name || !newVehicle.license_plate) {
+            alert('Please fill in all required fields: Vehicle Name and License Plate');
+            return;
+          }
+          
           if (editingVehicle) {
+            console.log('🔄 Updating existing vehicle...');
             // Update existing vehicle
             const updatedVehicle = await vehicleService.updateVehicle(editingVehicle.id, newVehicle);
+            console.log('✅ Update result:', updatedVehicle);
+            
             if (updatedVehicle) {
-              setVehicles(prev => prev.map(veh => veh.id === editingVehicle.id ? updatedVehicle : veh));
+              setVehicles(prev => {
+                const updated = prev.map(veh => veh.id === editingVehicle.id ? updatedVehicle : veh);
+                console.log('🔄 Updated vehicles state:', updated);
+                return updated;
+              });
               alert('Vehicle updated successfully');
+            } else {
+              alert('Failed to update vehicle. Please try again.');
             }
           } else {
+            console.log('➕ Creating new vehicle...');
             // Create new vehicle
             const vehicleData = {
               ...newVehicle,
               status: 'active'
             };
+            console.log('📝 Vehicle data to create:', vehicleData);
+            
             const createdVehicle = await vehicleService.createVehicle(vehicleData);
+            console.log('✅ Create result:', createdVehicle);
+            
             if (createdVehicle) {
-              setVehicles(prev => [...prev, createdVehicle]);
+              setVehicles(prev => {
+                const updated = [...prev, createdVehicle];
+                console.log('🔄 Updated vehicles state:', updated);
+                return updated;
+              });
               alert('Vehicle added successfully');
+            } else {
+              alert('Failed to create vehicle. Please try again.');
             }
           }
           setShowVehicleModal(false);
         } catch (error) {
-          console.error('Error saving vehicle:', error);
-          alert('Error saving vehicle. Please try again.');
+          console.error('❌ Error saving vehicle:', error);
+          console.error('Error details:', JSON.stringify(error, null, 2));
+          alert(`Error saving vehicle: ${error.message || 'Unknown error'}`);
         }
       };
       const handleVehicleDelete = async (id) => {
         if (window.confirm('Delete this vehicle?')) {
           try {
+            console.log('🗑️ Starting vehicle deletion...');
+            console.log('🆔 Vehicle ID to delete:', id);
+            
             await vehicleService.deleteVehicle(id);
-            setVehicles(prev => prev.filter(veh => veh.id !== id));
+            console.log('✅ Vehicle deleted from database');
+            
+            setVehicles(prev => {
+              const updated = prev.filter(veh => veh.id !== id);
+              console.log('🔄 Updated vehicles state after deletion:', updated);
+              return updated;
+            });
             alert('Vehicle deleted successfully');
           } catch (error) {
-            console.error('Error deleting vehicle:', error);
-            alert('Error deleting vehicle. Please try again.');
+            console.error('❌ Error deleting vehicle:', error);
+            console.error('Error details:', JSON.stringify(error, null, 2));
+            alert(`Error deleting vehicle: ${error.message || 'Unknown error'}`);
           }
         }
       };
@@ -1701,6 +1905,9 @@ const EmployeeTrackingAppContent = () => {
         closeExportChoice();
       };
 
+      // Debug: Log current vehicles state
+      console.log('🚗 VehiclesTab render - Current vehicles state:', vehicles);
+      
       return (
         <div className="space-y-6">
           <div className="flex gap-2 mb-4">
@@ -3079,7 +3286,7 @@ const EmployeeTrackingAppContent = () => {
             lat: activeSessions[0].locationHistory[activeSessions[0].locationHistory.length-1].latitude,
             lng: activeSessions[0].locationHistory[activeSessions[0].locationHistory.length-1].longitude
           }
-        : { lat: 41.9981, lng: 21.4254 }; // Default to Skopje
+        : { lat: 46.5197, lng: 6.6323 }; // Default to Lausanne, Switzerland
 
       const { isLoaded } = useJsApiLoader({
         googleMapsApiKey: GOOGLE_MAPS_API_KEY
@@ -3523,7 +3730,14 @@ const EmployeeTrackingAppContent = () => {
         <div className="w-64 bg-white shadow-lg flex flex-col">
           {/* Header */}
           <div className="p-4 border-b bg-orange-500">
-            <h1 className="text-xl font-bold text-white">{t('adminDashboard')}</h1>
+            <div className="flex items-center justify-center space-x-3">
+              <img 
+                src="/logo.png" 
+                alt="FENIX Logo" 
+                className="w-12 h-9 object-contain rounded-full shadow-md" 
+              />
+              <h1 className="text-xl font-bold text-white">{t('adminDashboard')}</h1>
+            </div>
           </div>
 
           {/* Navigation */}
@@ -3560,18 +3774,39 @@ const EmployeeTrackingAppContent = () => {
 
         {/* Main Content */}
         <main className="flex-1 overflow-auto">
-          {/* New header bar for language selector and logout */}
+          {/* Top bar with controls */}
           <div className="flex justify-end items-center p-4 bg-white border-b">
-            <LanguageSelector />
-            <button
-              onClick={() => {
-                setCurrentUser(null);
-                setCurrentView('login');
-              }}
-              className="ml-4 text-gray-700 hover:text-orange-500 transition-colors"
-            >
-              <LogOut size={22} />
-            </button>
+            <div className="flex items-center space-x-4">
+              <LanguageSelector />
+              <button
+                onClick={async () => {
+                  try {
+                    console.log('🚪 Logging out user...');
+                    
+                    // Clear session from database
+                    const sessionToken = sessionService.getCurrentSessionToken();
+                    if (sessionToken) {
+                      await sessionService.deleteSession(sessionToken);
+                    }
+                    
+                    // Clear app state
+                    setCurrentUser(null);
+                    setCurrentView('login');
+                    
+                    console.log('✅ Logout successful');
+                  } catch (error) {
+                    console.error('❌ Error during logout:', error);
+                    // Still clear app state even if session deletion fails
+                    setCurrentUser(null);
+                    setCurrentView('login');
+                  }
+                }}
+                className="text-gray-700 hover:text-orange-500 transition-colors"
+                title={t('logout')}
+              >
+                <LogOut size={22} />
+              </button>
+            </div>
           </div>
           <div className="p-6">
             {activeTab === 'overview' && <OverviewTab />}

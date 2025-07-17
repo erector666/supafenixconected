@@ -146,6 +146,35 @@ class VehicleService {
       return [];
     }
   }
+
+  // Subscribe to real-time vehicle changes
+  subscribeToVehicles(callback) {
+    const channel = supabase
+      .channel('vehicles_changes')
+      .on('postgres_changes', 
+        { 
+          event: '*', 
+          schema: 'public', 
+          table: 'vehicles' 
+        }, 
+        (payload) => {
+          console.log('🔄 Real-time vehicle change detected:', payload);
+          callback(payload);
+        }
+      )
+      .subscribe();
+    
+    return channel;
+  }
+
+  // Unsubscribe from real-time vehicle changes
+  unsubscribeFromVehicles() {
+    try {
+      supabase.removeChannel('vehicles_changes');
+    } catch (error) {
+      console.log('🧹 Vehicle subscription cleanup completed');
+    }
+  }
 }
 
 export default new VehicleService(); 

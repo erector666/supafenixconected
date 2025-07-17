@@ -76,6 +76,8 @@ export default {
   pressEnter: 'Shtyp Enter për të hyrë',
   employeeLogin: 'Hyrja e Punëtorit',
   adminLogin: 'Hyrja e Administratorit',
+  rememberMe: 'Më mbaj mend',
+  loggingIn: 'Duke hyrë...',
 
   // Employee Dashboard
   employeeDashboard: 'Paneli i Punëtorit',

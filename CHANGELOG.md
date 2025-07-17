@@ -1,5 +1,301 @@
 # Changelog - FENIX Construction Tracker
 
+## [1.5.28] - 2025-01-16
+
+### Changed
+- **Admin Panel Logo Position**: Moved round logo from main header back to sidebar header, positioned before "Admin Dashboard" text
+- **Logo Size**: Decreased round logo size by 1x (from w-24 h-18 to w-12 h-9) for better fit in sidebar
+- **Layout Optimization**: Removed logo from main header to reduce clutter and focus on controls
+- **Sidebar Design**: Logo now appears before dashboard title with proper spacing
+
+## [1.5.27] - 2025-01-16
+
+### Changed
+- **Admin Panel Logo**: Removed square logo from sidebar header, keeping only the round logo in main header
+- **Round Logo Size**: Doubled the size of round logo in admin panel (from w-12 h-9 to w-24 h-18)
+- **Cleaner Design**: Simplified sidebar header to show only "Admin Dashboard" text
+- **Enhanced Branding**: Larger round logo provides better visual impact in main content area
+
+## [1.5.26] - 2025-01-16
+
+### Changed
+- **Login Logo Size**: Increased FENIX logo size by 1x (doubled from w-64 h-32 to w-[512px] h-[256px])
+- **Enhanced Visibility**: Logo is now larger for better brand presence and visual impact
+- **Balanced Proportions**: Maintains good visual balance while increasing prominence
+
+## [1.5.25] - 2025-01-16
+
+### Changed
+- **Login Logo Size**: Reduced FENIX logo size on login page (from w-[768px] h-[384px] to w-64 h-32)
+- **Balanced Design**: Logo is now appropriately sized for better visual balance
+- **Improved Layout**: Smaller logo creates better proportion with other login form elements
+
+## [1.5.24] - 2025-01-16
+
+### Changed
+- **Login Logo Size**: Doubled the size of FENIX logo on login page (from w-96 h-48 to w-[768px] h-[384px])
+- **Enhanced Visibility**: Logo is now twice as large for maximum visual impact and brand presence
+- **Prominent Branding**: Larger logo creates stronger brand recognition on login interface
+
+## [1.5.23] - 2025-01-16
+
+### Fixed
+- **Admin Sidebar Logo Position**: Moved FENIX logo to appear BEFORE "Admin Dashboard" text
+- **Correct Order**: Logo now appears first, followed by the dashboard title text
+
+## [1.5.22] - 2025-01-16
+
+### Changed
+- **Admin Sidebar Logo**: Added FENIX logo right after "Admin Dashboard" text in sidebar header
+- **Sidebar Layout**: Logo now appears next to the dashboard title with proper spacing
+- **Visual Consistency**: Maintains brand presence in sidebar while keeping main header clean
+
+## [1.5.21] - 2025-01-16
+
+### Fixed
+- **Remember Me Label**: Removed debugging text "(State: false)" from Remember Me checkbox label
+- **Clean UI**: Restored clean, professional appearance of login form checkbox
+
+## [1.5.20] - 2025-01-16
+
+### Changed
+- **Login Logo Size**: Doubled the size of FENIX logo on login page (from w-48 h-24 to w-96 h-48)
+- **Enhanced Visibility**: Larger logo creates stronger visual impact and brand presence
+- **Prominent Branding**: Logo now dominates the login interface for maximum brand recognition
+
+## [1.5.19] - 2025-01-16
+
+### Changed
+- **Login Page Header**: Removed all text from login page, keeping only the FENIX logo
+- **Minimal Design**: Created ultra-clean login interface with logo-only branding
+- **Visual Focus**: Logo now serves as the sole brand identifier on login page
+
+## [1.5.18] - 2025-01-16
+
+### Changed
+- **Login Page Text**: Removed duplicate "FENIX" text from login page header
+- **Login Header**: Now shows only "Construction Tracker" as the main title
+- **Cleaner Design**: Eliminated redundant text for cleaner login interface
+
+## [1.5.17] - 2025-01-16
+
+### Changed
+- **Language Selector Position**: Moved language selector to right side, positioned before the logo
+- **Header Layout**: All controls now grouped on the right side in order: Language → Logo → Logout
+- **Right-Aligned Design**: Changed from justify-between to justify-end for consistent right alignment
+
+## [1.5.16] - 2025-01-16
+
+### Changed
+- **Logo Position**: Moved FENIX logo to far right corner of admin panel header
+- **Layout Reorganization**: Combined logo and logout button in single top bar
+- **Logo Size**: Reduced logo size to w-12 h-9 for better fit in top bar
+- **Header Design**: Language selector on left, logo and logout button on right
+- **Space Optimization**: Removed separate centered logo header for more compact design
+
+## [1.5.15] - 2025-01-16
+
+### Changed
+- **Header Design**: Removed "FENIX" text from admin panel header, keeping only the logo
+- **Minimal Design**: Created clean, minimal header with just the round FENIX logo centered
+- **Visual Focus**: Logo now stands alone as the primary brand element
+
+## [1.5.14] - 2025-01-16
+
+### Changed
+- **Header Text**: Simplified admin panel header text from "FENIX Construction Tracker" to just "FENIX"
+- **Cleaner Design**: Streamlined header appearance with shorter, cleaner text
+
+## [1.5.13] - 2025-01-16
+
+### Changed
+- **Logo Size**: Increased FENIX logo size by 20% (from w-16 h-12 to w-20 h-15)
+- **Logo Style**: Made logo round with rounded-full class and added shadow-lg for depth
+- **Visual Enhancement**: Enhanced logo appearance with circular shape and shadow effects
+
+## [1.5.12] - 2025-01-16
+
+### Changed
+- **Logo Placement**: Moved FENIX logo to center of admin panel main content area
+- **Logo Size**: Increased logo size to w-16 h-12 for better visibility in centered position
+- **Header Layout**: Redesigned admin panel header with centered logo and "FENIX Construction Tracker" title
+- **Sidebar Header**: Simplified sidebar header to show only "Admin Dashboard" text without logo
+- **Visual Hierarchy**: Improved layout with logo prominently displayed in main content area
+
+## [1.5.11] - 2025-01-16
+
+### Changed
+- **Logo Size**: Increased FENIX logo size in admin sidebar header by 30% (from w-8 h-6 to w-10 h-8)
+- **Visual Impact**: Enhanced logo visibility and brand presence in the admin interface
+
+## [1.5.10] - 2025-01-16
+
+### Fixed
+- **Duplicate Logo Issue**: Removed duplicate FENIX logo from main content header in admin panel
+- **UI Consistency**: Now shows logo only in sidebar header for cleaner design
+
+### Changed
+- **Admin Header**: Simplified main content header to show only "FENIX" text without duplicate logo
+- **Visual Design**: Cleaner header layout with single logo in sidebar
+
+## [1.5.9] - 2025-01-16
+
+### Fixed
+- **Session Service Field Mismatch**: Fixed session service to use correct database field names (token, is_remember_me, last_accessed_at)
+- **Remember Me Checkbox State**: Fixed checkbox state not being captured correctly in login form
+- **Session Creation 400 Errors**: Fixed field name mismatches causing Bad Request errors
+- **Database Schema Alignment**: Aligned session service with actual database schema
+
+### Changed
+- **Session Token Generation**: Now generates unique tokens instead of using database IDs
+- **Field Names**: Updated to match database schema (is_remember_me instead of remember_me, last_accessed_at instead of last_activity)
+- **Error Handling**: Enhanced error logging for better debugging of session creation issues
+
+### Technical Improvements
+- **Session Service**: Fixed all database field references to match schema
+- **Token Management**: Proper token generation and storage
+- **Debug Logging**: Added detailed logging for session creation process
+- **Database Compatibility**: Ensured service works with the actual database structure
+
+## [1.5.8] - 2025-01-16
+
+### Fixed
+- **Remember Me Database Issue**: Created SQL script to set up missing sessions table in Supabase
+- **Session Creation Errors**: Fixed 404 errors when creating persistent login sessions
+- **Database Schema**: Added complete sessions table with proper RLS policies and cleanup functions
+
+### Added
+- **Sessions Table Setup**: Created comprehensive SQL script for sessions table creation
+- **Setup Documentation**: Added detailed setup guide for fixing "Remember Me" functionality
+- **Database Security**: Implemented proper RLS policies for session management
+- **Automatic Cleanup**: Added scheduled cleanup of expired sessions
+
+### Technical Improvements
+- **Database Schema**: Complete sessions table with indexes and security policies
+- **Session Management**: Proper session creation, validation, and cleanup
+- **Security**: Row Level Security policies ensure users can only access their own sessions
+- **Performance**: Database indexes for efficient session queries
+
+## [1.5.7] - 2025-01-16
+
+### Added
+- **Admin Panel Logo**: Added FENIX logo to the top left of admin panel sidebar header
+- **Main Header Logo**: Added FENIX logo and branding to the main content header bar
+- **Consistent Branding**: Logo appears in both sidebar and main header for better brand visibility
+
+### Changed
+- **Admin Dashboard Layout**: Enhanced header design with logo and improved visual hierarchy
+- **Header Structure**: Reorganized header elements for better spacing and alignment
+
+## [1.5.6] - 2025-01-16
+
+### Added
+- **Remember Me Functionality**: Added persistent login sessions with "Remember Me" checkbox
+- **Session Management**: Implemented database-based session storage for secure login persistence
+- **Auto-login**: Users are automatically logged in when refreshing the page if "Remember Me" was enabled
+- **Session Cleanup**: Automatic cleanup of expired sessions and proper logout handling
+
+### Changed
+- **Materials Tab**: Removed mock materials data - now starts with empty materials list
+- **Login Form**: Enhanced with remember me checkbox and loading states
+- **Logout Process**: Improved to properly clear sessions from database
+
+### Technical Improvements
+- **Session Service**: New service for managing user sessions and remember me functionality
+- **Database Schema**: Added sessions table for persistent login storage
+- **Security**: Proper session validation and expiration handling
+- **User Experience**: Seamless login persistence across browser sessions
+
+## [1.5.5] - 2025-01-16
+
+### Added
+- **Real-time Vehicle Synchronization**: Workers now see updated vehicle information immediately when admins make changes
+- **Vehicle Refresh Button**: Added refresh button in worker vehicle selection modal to manually update vehicle list
+- **Real-time Vehicle Subscriptions**: Implemented Supabase real-time subscriptions for instant vehicle updates
+- **Vehicle Update Notifications**: Added visual notifications when vehicle list is refreshed
+- **Loading States**: Added loading indicators for vehicle refresh operations
+
+### Changed
+- **Vehicle Selection Modal**: Enhanced with refresh functionality and real-time updates
+- **Vehicle State Management**: Improved to handle real-time changes from database
+- **User Experience**: Workers now always see the most current vehicle information
+
+### Technical Improvements
+- **Real-time Subscriptions**: Added Supabase real-time channels for vehicle table changes
+- **State Synchronization**: Vehicle state automatically updates when admin makes changes
+- **Error Handling**: Enhanced error handling for real-time operations
+- **Performance**: Optimized vehicle loading and refresh operations
+
+### Real-time Features
+- **Instant Updates**: Vehicle changes appear immediately in worker modal
+- **Automatic Sync**: No manual refresh needed - changes sync automatically
+- **Manual Refresh**: Workers can manually refresh if needed
+- **Visual Feedback**: Loading states and success notifications
+
+### User Experience
+- **Always Current Data**: Workers see the latest vehicle information
+- **No Manual Refresh**: Changes sync automatically in background
+- **Visual Feedback**: Clear indicators when data is being updated
+- **Reliable Updates**: Real-time subscriptions ensure data consistency
+
+## [1.5.4] - 2025-01-16
+
+### Added
+- **Vehicle Operations Debugging**: Added comprehensive logging to vehicle management operations
+- **Enhanced Error Handling**: Improved error messages and debugging information for vehicle CRUD operations
+- **State Management Logging**: Added logging to track vehicle state changes in the frontend
+- **Validation**: Added client-side validation for required vehicle fields (name and license plate)
+
+### Changed
+- **Vehicle Save Function**: Enhanced with detailed logging and better error handling
+- **Vehicle Delete Function**: Added logging to track deletion process
+- **Vehicle Loading**: Added logging to verify vehicles are loaded correctly from database
+- **Error Messages**: More descriptive error messages for vehicle operations
+
+### Technical Improvements
+- **Console Logging**: Added emoji-based logging for better debugging visibility
+- **State Tracking**: Log vehicle state changes to identify potential state management issues
+- **Error Details**: Enhanced error logging with JSON.stringify for better debugging
+- **Validation**: Prevent submission of incomplete vehicle data
+
+### Debugging Features
+- **Operation Tracking**: Log each step of vehicle operations (create, update, delete)
+- **State Verification**: Log vehicle state before and after operations
+- **Error Context**: Provide detailed error information for troubleshooting
+- **Data Validation**: Log vehicle data being sent to database
+
+### User Experience
+- **Better Feedback**: More informative error messages for users
+- **Validation**: Clear feedback when required fields are missing
+- **Debugging**: Console logs help identify issues during development
+
+## [1.5.3] - 2025-01-16
+
+### Fixed
+- **Map Default Center**: Changed default map center from Skopje to Lausanne, Switzerland
+- **Location Accuracy**: Improved GPS location tracking with better error handling
+- **Build Errors**: Fixed syntax errors and import issues
+
+### Added
+- **Location Refresh Button**: Added manual location refresh button in employee dashboard
+- **Location Debugging**: Added console logging for location tracking debugging
+- **High Accuracy GPS**: Enhanced location tracking with high accuracy settings
+
+### Changed
+- **Default Map Location**: Map now defaults to Lausanne (46.5197, 6.6323) instead of Skopje
+- **Location Timeout**: Increased location timeout to 15 seconds for better accuracy
+- **Location Updates**: Improved continuous location tracking with better error handling
+
+### Technical Improvements
+- **GPS Settings**: Enhanced geolocation options for better accuracy
+- **Error Handling**: Better error messages for location tracking failures
+- **Debug Information**: Added console logging for troubleshooting location issues
+
+### User Experience
+- **Manual Refresh**: Workers can now manually refresh their location if needed
+- **Better Accuracy**: Improved GPS accuracy for more precise location tracking
+- **Visual Feedback**: Location refresh button provides immediate feedback
+
 ## [1.5.2] - 2025-01-16
 
 ### Fixed

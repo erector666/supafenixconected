@@ -76,6 +76,8 @@ export default {
   pressEnter: 'Pressione Enter para entrar',
   employeeLogin: 'Login do Funcionário',
   adminLogin: 'Login do Administrador',
+  rememberMe: 'Lembrar de mim',
+  loggingIn: 'Fazendo login...',
 
   // Employee Dashboard
   employeeDashboard: 'Painel do Funcionário',

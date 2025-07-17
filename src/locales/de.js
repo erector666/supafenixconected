@@ -76,6 +76,8 @@ export default {
   pressEnter: 'Drücken Sie Enter zum Anmelden',
   employeeLogin: 'Mitarbeiter-Anmeldung',
   adminLogin: 'Administrator-Anmeldung',
+  rememberMe: 'Angemeldet bleiben',
+  loggingIn: 'Anmeldung läuft...',
 
   // Employee Dashboard
   employeeDashboard: 'Mitarbeiter-Dashboard',
